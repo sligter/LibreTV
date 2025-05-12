@@ -33,6 +33,21 @@
     
     <script src="libs/tailwindcss.min.js"></script>
     <link rel="stylesheet" href="css/styles.css">
+    <script>
+        // 确保密码验证在页面加载完成后立即运行
+        document.addEventListener('DOMContentLoaded', function() {
+            // 等待一小段时间确保所有脚本已加载
+            setTimeout(function() {
+                console.log("初始化密码验证...");
+                if (typeof initPasswordProtection === 'function') {
+                    // 直接调用password.js中的初始化函数
+                    initPasswordProtection();
+                } else {
+                    console.error("密码验证函数未找到!");
+                }
+            }, 100);
+        });
+    </script>
 </head>
 <body class="page-bg text-white">
     <!-- 将历史记录按钮移到左上角，并缩小尺寸 -->
@@ -177,6 +192,25 @@
                         <div class="toggle-dot absolute w-5 h-5 bg-white rounded-full top-0.5 left-0.5 transition-transform duration-300 ease-in-out"></div>
                     </div>
                 </div>
+            </div>
+
+            <!-- 弹幕设置区域 -->
+            <div class="p-3 bg-[#151515] rounded-lg shadow-inner mt-5">
+                <label class="block text-sm font-medium text-gray-400 mb-3 border-b border-[#333] pb-1">弹幕设置</label>
+                
+                <!-- 弹幕API地址设置 -->
+                <div class="mb-3">
+                    <label class="text-sm font-medium text-gray-400 block mb-1">弹幕API接口地址</label>
+                    <input type="text" id="danmakuApiUrl" placeholder="http://localhost:5000" 
+                           class="w-full bg-[#222] border border-[#333] text-white px-3 py-2 rounded focus:outline-none focus:border-[#555]"
+                           autocomplete="off">
+                    <p class="text-xs text-gray-500 mt-1">设置弹幕服务器API地址，默认为http://localhost:5000</p>
+                </div>
+                
+                <!-- 保存弹幕设置按钮 -->
+                <button id="saveDanmakuSettings" class="px-4 py-2 bg-[#333] hover:bg-[#444] text-white rounded-lg text-sm transition-all duration-300 w-full">
+                    保存弹幕设置
+                </button>
             </div>
 
             <!-- 一般功能区域 -->
@@ -411,6 +445,39 @@
     <script src="js/ui.js"></script>
     <script src="js/api.js"></script>
     <script src="js/password.js"></script>
+    
+    <!-- 弹幕设置处理脚本 -->
+    <script>
+        // 在DOM加载完成后初始化弹幕设置
+        document.addEventListener('DOMContentLoaded', function() {
+            // 从localStorage获取弹幕API地址
+            const apiUrl = localStorage.getItem('danmakuApiUrl') || 'http://localhost:5000';
+            document.getElementById('danmakuApiUrl').value = apiUrl;
+            
+            // 添加保存按钮事件监听
+            document.getElementById('saveDanmakuSettings').addEventListener('click', function() {
+                const apiUrl = document.getElementById('danmakuApiUrl').value.trim();
+                
+                // 如果为空，使用默认值
+                if (!apiUrl) {
+                    localStorage.setItem('danmakuApiUrl', 'http://localhost:5000');
+                    document.getElementById('danmakuApiUrl').value = 'http://localhost:5000';
+                    showToast('已恢复默认弹幕API地址', 'success');
+                    return;
+                }
+                
+                // 检查URL格式是否有效
+                try {
+                    new URL(apiUrl);
+                    localStorage.setItem('danmakuApiUrl', apiUrl);
+                    showToast('弹幕API地址保存成功', 'success');
+                } catch (e) {
+                    showToast('请输入有效的URL地址', 'error');
+                }
+            });
+        });
+    </script>
+    
     <script src="js/app.js"></script>
     <script src="js/douban.js"></script>
 

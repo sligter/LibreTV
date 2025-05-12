@@ -178,9 +178,122 @@
                 margin-bottom: 4px;
             }
         }
+
+        /* 弹幕相关样式 - 全部移除，改用DPlayer自带的弹幕样式 */
+        #danmakuContainer {
+            display: none; /* 隐藏自定义弹幕容器 */
+        }
+        .danmaku {
+            display: none; /* 隐藏自定义弹幕元素 */
+        }
+        @keyframes danmakuMove {
+            from { transform: translateX(100%); }
+            to { transform: translateX(-100%); }
+        }
+        .danmaku-panel {
+            position: absolute;
+            bottom: 50px;
+            left: 0;
+            right: 0;
+            background-color: rgba(0, 0, 0, 0.6);
+            padding: 10px;
+            z-index: 95;
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .danmaku-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .danmaku-search {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .danmaku-list {
+            max-height: 150px;
+            overflow-y: auto;
+            border: 1px solid #333;
+            border-radius: 5px;
+            padding: 5px;
+        }
+        .danmaku-item {
+            padding: 5px;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+        .danmaku-item:hover {
+            background-color: #333;
+        }
+        .danmaku-tabs {
+            display: flex;
+            border-bottom: 1px solid #333;
+        }
+        .danmaku-tab {
+            padding: 5px 10px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+        .danmaku-tab.active {
+            border-bottom-color: #00ccff;
+            color: #00ccff;
+        }
+        .danmaku-tab-content {
+            display: none;
+            padding: 10px 0;
+        }
+        .danmaku-tab-content.active {
+            display: block;
+        }
+        /* 弹幕API信息 */
+        .danmaku-api-info {
+            margin-top: 10px;
+            padding: 5px;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            font-size: 12px;
+            color: #aaa;
+        }
+        /* 设置项高亮效果 */
+        .highlight-setting {
+            animation: highlight-pulse 2s ease-in-out;
+            position: relative;
+        }
+        @keyframes highlight-pulse {
+            0%, 100% { background-color: transparent; }
+            50% { background-color: rgba(0, 204, 255, 0.2); border-radius: 4px; }
+        }
+        /* Toast消息类型 */
+        #toast.success {
+            background-color: #10B981;
+        }
+        #toast.error {
+            background-color: #EF4444;
+        }
+        #toast.info {
+            background-color: #3B82F6;
+        }
     </style>
 </head>
-<body>
+<script>
+    // 确保密码验证在页面加载完成后立即运行
+    document.addEventListener('DOMContentLoaded', function() {
+        // 等待一小段时间确保所有脚本已加载
+        setTimeout(function() {
+            console.log("初始化密码验证...");
+            if (typeof initPasswordProtection === 'function') {
+                // 直接调用password.js中的初始化函数
+                initPasswordProtection();
+            } else {
+                console.error("密码验证函数未找到!");
+            }
+        }, 100);
+    });
+</script>
+<body class="page-bg text-white">
     <header class="bg-[#111] p-4 flex items-center border-b border-[#333] gap-2 player-header">
         <div class="flex items-center min-w-0">
             <a href="/" class="flex items-center min-w-0">
@@ -223,6 +336,8 @@
         <div id="playerContainer" class="player-container">
             <div class="relative">
                 <div id="player"></div>
+                <!-- 弹幕容器 -->
+                <div id="danmakuContainer"></div>
                 <div class="loading-container" id="loading">
                     <div class="loading-spinner"></div>
                     <div>正在加载视频...</div>
@@ -231,6 +346,97 @@
                     <div class="error-icon">⚠️</div>
                     <div id="error-message">视频加载失败</div>
                     <div style="margin-top: 10px; font-size: 14px; color: #aaa;">请尝试其他视频源或稍后重试</div>
+                </div>
+                <!-- 弹幕控制面板 -->
+                <div id="danmakuPanel" class="danmaku-panel">
+                    <div class="danmaku-tabs">
+                        <div class="danmaku-tab active" data-tab="settings">弹幕设置</div>
+                        <div class="danmaku-tab" data-tab="search">弹幕搜索</div>
+                    </div>
+                    <div class="danmaku-tab-content active" data-tab="settings">
+                        <div class="danmaku-controls">
+                            <div class="flex items-center gap-2">
+                                <span>显示弹幕</span>
+                                <label class="switch">
+                                    <input type="checkbox" id="danmakuToggle" checked>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span>弹幕不透明度</span>
+                                <input type="range" id="danmakuOpacity" min="10" max="100" value="80" class="w-24">
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span>弹幕速度</span>
+                                <input type="range" id="danmakuSpeed" min="10" max="200" value="100" class="w-24">
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span>弹幕大小</span>
+                                <input type="range" id="danmakuSize" min="12" max="36" value="23" class="w-24">
+                                <span id="sizeValue">23px</span>
+                            </div>
+                            
+                            <!-- 添加弹幕时间偏移设置 -->
+                            <div class="flex items-center gap-2 mt-2">
+                                <span>时间偏移</span>
+                                <input type="range" id="danmakuTimeOffsetSlider" min="-60" max="60" value="0" class="w-24">
+                                <div class="flex items-center">
+                                    <input type="number" id="danmakuTimeOffsetInput" min="-60" max="60" value="0" 
+                                           class="w-12 h-6 bg-[#222] border border-[#333] text-white text-center text-xs rounded">
+                                    <span class="ml-1">秒</span>
+                                </div>
+                            </div>
+                            
+                            <!-- 添加弹幕颜色选择 -->
+                            <div class="flex items-center gap-2 mt-2">
+                                <span>弹幕颜色</span>
+                                <div class="flex gap-1">
+                                    <button class="w-6 h-6 rounded-full border border-white bg-white danmaku-color" data-color="#ffffff" title="白色"></button>
+                                    <button class="w-6 h-6 rounded-full border border-white bg-yellow-300 danmaku-color" data-color="#fcd34d" title="黄色"></button>
+                                    <button class="w-6 h-6 rounded-full border border-white bg-red-500 danmaku-color" data-color="#ef4444" title="红色"></button>
+                                    <button class="w-6 h-6 rounded-full border border-white bg-green-400 danmaku-color" data-color="#4ade80" title="绿色"></button>
+                                    <button class="w-6 h-6 rounded-full border border-white bg-blue-400 danmaku-color" data-color="#60a5fa" title="蓝色"></button>
+                                    <button class="w-6 h-6 rounded-full border border-white bg-purple-400 danmaku-color" data-color="#c084fc" title="紫色"></button>
+                                    <button class="w-6 h-6 rounded-full border border-white danmaku-color random-color" data-color="random" title="随机颜色" style="background: linear-gradient(45deg, red, orange, yellow, green, blue, indigo, violet);"></button>
+                                </div>
+                            </div>
+                            
+                            <!-- 添加清除弹幕缓存按钮 -->
+                            <div class="flex items-center gap-2 mt-3">
+                                <button id="clearDanmakuCacheBtn" class="px-3 py-1 bg-[#222] hover:bg-[#333] border border-[#333] rounded text-white transition">
+                                    清除弹幕缓存
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="danmaku-tab-content" data-tab="search">
+                        <div class="danmaku-search">
+                            <div class="flex gap-2">
+                                <select id="danmakuSource" class="bg-[#222] border border-[#333] rounded px-2 py-1">
+                                    <option value="企鹅">企鹅</option>
+                                    <option value="奇异">奇异</option>
+                                    <option value="阿B">阿B</option>
+                                    <option value="阿酷">阿酷</option>
+                                    <option value="阿芒">阿芒</option>
+                                </select>
+                                <input type="text" id="danmakuSearchInput" placeholder="输入视频名称" class="flex-1 bg-[#222] border border-[#333] rounded px-2 py-1">
+                                <button id="danmakuSearchBtn" class="px-3 py-1 bg-[#00ccff] text-black rounded">搜索</button>
+                            </div>
+                            <div id="danmakuVideoList" class="danmaku-list hidden">
+                                <!-- 搜索结果将在这里动态生成 -->
+                            </div>
+                            <div id="danmakuEpisodeList" class="danmaku-list hidden">
+                                <!-- 集数列表将在这里动态生成 -->
+                            </div>
+                            <div id="danmakuStatus"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- 添加API信息显示 -->
+                    <div class="danmaku-api-info">
+                        当前弹幕API地址: <span id="currentDanmakuApi"></span>
+                        <div class="text-xs mt-1">可在首页设置中修改API地址</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -283,6 +489,15 @@
                         </svg>
                     </button>
                     
+                    <!-- 弹幕按钮 -->
+                    <button id="danmakuBtn" onclick="toggleDanmakuPanel()" title="弹幕设置" 
+                            class="px-2 py-1 bg-[#222] hover:bg-[#333] border border-[#333] text-white rounded-lg transition">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                        </svg>
+                    </button>
+                    
                     <!-- 锁定控制按钮 - 始终显示在最右侧 -->
                     <button id="lockToggle" onclick="toggleControlsLock()" title="锁定控制" 
                             class="px-2 py-1 bg-[#222] hover:bg-[#333] border border-[#333] text-white rounded-lg transition flex-shrink-0">
@@ -315,6 +530,11 @@
         <span id="shortcutText"></span>
     </div>
 
+    <!-- 错误提示框 -->
+    <div id="toast" class="fixed top-4 left-1/2 -translate-x-1/2 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg transform transition-all duration-300 opacity-0 -translate-y-full z-50">
+        <p id="toastMessage"></p>
+    </div>
+
     <!-- 引入纯 JS sha256（HTTP 下依然可用） -->
     <script src="libs/sha256.min.js"></script>
     <script>
@@ -337,6 +557,10 @@
         // PASSWORD 变量将在这里被服务器端注入
         window.__ENV__.PASSWORD = "{{PASSWORD}}";
 
+        // 设置API基础URL变量 - 弹幕服务地址，从localStorage读取，如果没有则使用默认值
+        const API_BASE_URL = localStorage.getItem('danmakuApiUrl') || "http://localhost:5000";
+        console.log('弹幕API地址:', API_BASE_URL);
+        
         // =================================
         // ============== PLAYER ==========
         // =================================
@@ -354,6 +578,23 @@
         let shortcutHintTimeout = null; // 用于控制快捷键提示显示时间
         let adFilteringEnabled = true; // 默认开启广告过滤
         let progressSaveInterval = null; // 定期保存进度的计时器
+
+        // 弹幕相关变量
+        let danmakuEnabled = localStorage.getItem('danmakuEnabled') !== 'false'; // 默认开启
+        let danmakuList = []; // 弹幕列表
+        let danmakuDisplayed = {}; // 已显示的弹幕ID，防止重复显示
+        let danmakuSpeed = parseFloat(localStorage.getItem('danmakuSpeed') || '1.0'); // 弹幕速度因子
+        let danmakuOpacity = parseFloat(localStorage.getItem('danmakuOpacity') || '0.8'); // 弹幕透明度
+        let danmakuSize = parseInt(localStorage.getItem('danmakuSize') || '23'); // 弹幕大小
+        let danmakuArea = parseInt(localStorage.getItem('danmakuArea') || '75'); // 弹幕显示区域，默认75%
+        let danmakuColor = localStorage.getItem('danmakuColor') || '#ffffff'; // 弹幕颜色，默认白色
+        let danmakuTimeOffset = parseInt(localStorage.getItem('danmakuTimeOffset') || '0'); // 弹幕时间偏移量（秒）
+        let danmakuTracks = 15; // 弹幕轨道数量
+        let danmakuTrackStatus = []; // 弹幕轨道状态数组
+        let currentDanmakuSource = '企鹅'; // 当前弹幕来源
+        let lastRequestTime = 0; // 上次请求时间，用于节流
+        let loadingDanmaku = false; // 是否正在加载弹幕
+        let lastCheckedTime = 0; // 上次检查弹幕的视频时间点
 
         // 页面加载
         document.addEventListener('DOMContentLoaded', function() {
@@ -510,11 +751,502 @@
                             saveCurrentProgress();
                             lastSave = now;
                         }
+
+                        // 处理弹幕显示
+                        if (danmakuEnabled) {
+                            showDanmakuAtCurrentTime();
+                        }
                     });
 
                     clearInterval(waitForVideo);
                 }
             }, 200);
+
+            // 初始化弹幕控件
+            initDanmakuControls();
+            
+            // 初始化弹幕轨道状态
+            initDanmakuTracks();
+            
+            // 初始化播放器后添加这行
+            dp.on('loadedmetadata', function() {
+                document.getElementById('loading').style.display = 'none';
+                videoHasEnded = false; // 视频加载时重置结束标志
+                
+                // 视频加载完成后重新设置进度条点击监听
+                setupProgressBarPreciseClicks();
+                
+                // 视频加载成功后，在稍微延迟后将其添加到观看历史
+                setTimeout(saveToHistory, 3000);
+                
+                // 启动定期保存播放进度
+                startProgressSaveInterval();
+                
+                // 应用弹幕自定义设置
+                applyDanmakuCustomSettings();
+                
+                // 覆盖发送弹幕的函数，使其支持自定义颜色
+                if (dp.danmaku) {
+                    const originalSend = dp.danmaku.send;
+                    dp.danmaku.send = function(danmaku) {
+                        // 如果是对象格式的弹幕，处理颜色
+                        if (typeof danmaku === 'object') {
+                            // 如果没有设置颜色，使用用户选择的颜色
+                            if (!danmaku.color) {
+                                // 如果是随机色，生成一个随机颜色
+                                if (danmakuColor === 'random') {
+                                    danmaku.color = parseInt(getRandomColor().slice(1), 16);
+                                } else {
+                                    // 使用用户选择的颜色
+                                    danmaku.color = parseInt(danmakuColor.slice(1), 16);
+                                }
+                            }
+                        }
+                        // 调用原始的发送函数
+                        return originalSend.call(this, danmaku);
+                    };
+                }
+            });
+        }
+
+        // 清空弹幕缓存
+        function clearDanmakuCache() {
+            // 清空内存中的弹幕数据
+            danmakuList = [];
+            danmakuDisplayed = {};
+            lastCheckedTime = 0;
+            
+            // 如果播放器已初始化，清空播放器中的弹幕
+            if (dp && dp.danmaku) {
+                dp.danmaku.clear();
+            }
+            
+            // 调用后端API清除本地弹幕文件
+            fetch(`${API_BASE_URL}/api/danmaku/clearCache`, {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.code === 200) {
+                    showToast(data.message, 'success');
+                } else {
+                    showToast(data.message || '清除本地弹幕文件失败', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('清除本地弹幕文件失败:', error);
+                showToast('清除本地弹幕文件失败', 'error');
+            });
+            
+            console.log('已清空弹幕缓存');
+        }
+
+        // 初始化弹幕控件
+        function initDanmakuControls() {
+            // 弹幕开关
+            document.getElementById('danmakuToggle').checked = danmakuEnabled;
+            document.getElementById('danmakuToggle').addEventListener('change', function(e) {
+                toggleDanmaku(e.target.checked);
+            });
+
+            // 弹幕透明度
+            document.getElementById('danmakuOpacity').value = Math.round(danmakuOpacity * 100);
+            document.getElementById('danmakuOpacity').addEventListener('input', function(e) {
+                danmakuOpacity = parseInt(e.target.value) / 100;
+                if (dp && dp.danmaku) {
+                    dp.danmaku.opacity(danmakuOpacity);
+                }
+                localStorage.setItem('danmakuOpacity', danmakuOpacity.toString());
+            });
+
+            // 弹幕速度
+            document.getElementById('danmakuSpeed').value = Math.round(danmakuSpeed * 100);
+            document.getElementById('danmakuSpeed').addEventListener('input', function(e) {
+                danmakuSpeed = parseInt(e.target.value) / 100;
+                if (dp && dp.danmaku) {
+                    // 最准确的方法是重新创建弹幕对象
+                    try {
+                        // 尝试更改css变量的方式设置速度
+                        const containers = document.getElementsByClassName('dplayer-danmaku-item');
+                        for (let i = 0; i < containers.length; i++) {
+                            // 根据速度动态调整动画持续时间，速度越快动画时间越短
+                            const speed = 8 / danmakuSpeed; // 默认8秒，速度越大，时间越短
+                            containers[i].style.animationDuration = `${speed}s`;
+                        }
+                        console.log(`设置弹幕速度为: ${danmakuSpeed}`);
+                    } catch (e) {
+                        console.warn('设置弹幕速度失败', e);
+                    }
+                }
+                localStorage.setItem('danmakuSpeed', danmakuSpeed.toString());
+            });
+
+            // 弹幕大小
+            document.getElementById('danmakuSize').value = danmakuSize;
+            document.getElementById('danmakuSize').addEventListener('input', function(e) {
+                danmakuSize = parseInt(e.target.value);
+                document.getElementById('sizeValue').textContent = `${danmakuSize}px`;
+                if (dp && dp.danmaku) {
+                    // 通过设置CSS变量控制弹幕大小
+                    document.documentElement.style.setProperty('--dplayer-danmaku-font-size', `${danmakuSize}px`);
+                    // 给弹幕容器添加类
+                    const container = document.querySelector('.dplayer-danmaku');
+                    if (container) {
+                        container.classList.add('custom-danmaku-size');
+                    }
+                }
+                localStorage.setItem('danmakuSize', danmakuSize.toString());
+            });
+            
+            // 初始化显示弹幕大小值
+            document.getElementById('sizeValue').textContent = `${danmakuSize}px`;
+            
+            // 初始化时间偏移设置
+            const timeOffsetSlider = document.getElementById('danmakuTimeOffsetSlider');
+            const timeOffsetInput = document.getElementById('danmakuTimeOffsetInput');
+            
+            // 设置初始值
+            timeOffsetSlider.value = danmakuTimeOffset;
+            timeOffsetInput.value = danmakuTimeOffset;
+            
+            // 滑块改变时同步更新输入框
+            timeOffsetSlider.addEventListener('input', function(e) {
+                const value = parseInt(e.target.value);
+                timeOffsetInput.value = value;
+                updateDanmakuTimeOffset(value);
+            });
+            
+            // 输入框改变时同步更新滑块
+            timeOffsetInput.addEventListener('change', function(e) {
+                let value = parseInt(e.target.value);
+                
+                // 限制输入范围
+                if (isNaN(value)) value = 0;
+                if (value < -60) value = -60;
+                if (value > 60) value = 60;
+                
+                // 更新UI和设置
+                timeOffsetInput.value = value;
+                timeOffsetSlider.value = value;
+                updateDanmakuTimeOffset(value);
+            });
+            
+            // 弹幕颜色选择
+            const colorButtons = document.querySelectorAll('.danmaku-color');
+            colorButtons.forEach(button => {
+                const color = button.getAttribute('data-color');
+                // 设置当前选中的颜色
+                if (color === danmakuColor || (color === 'random' && danmakuColor === 'random')) {
+                    button.classList.add('ring-2', 'ring-[#00ccff]', 'ring-offset-1');
+                }
+                
+                button.addEventListener('click', function() {
+                    // 移除所有按钮的选中状态
+                    colorButtons.forEach(btn => btn.classList.remove('ring-2', 'ring-[#00ccff]', 'ring-offset-1'));
+                    // 添加当前按钮的选中状态
+                    this.classList.add('ring-2', 'ring-[#00ccff]', 'ring-offset-1');
+                    
+                    // 设置弹幕颜色
+                    danmakuColor = this.getAttribute('data-color');
+                    localStorage.setItem('danmakuColor', danmakuColor);
+                    
+                    // 如果当前有弹幕发送框，更新其颜色预览
+                    const dplayerSendBox = document.querySelector('.dplayer-comment-setting-color');
+                    if (dplayerSendBox) {
+                        // 如果是随机色，生成一个随机颜色
+                        if (danmakuColor === 'random') {
+                            const randomColor = getRandomColor();
+                            dplayerSendBox.style.backgroundColor = randomColor;
+                        } else {
+                            dplayerSendBox.style.backgroundColor = danmakuColor;
+                        }
+                    }
+                });
+            });
+            
+            // 添加清除弹幕缓存按钮事件监听
+            document.getElementById('clearDanmakuCacheBtn').addEventListener('click', function() {
+                clearDanmakuCache();
+            });
+            
+            // 显示当前弹幕API地址
+            document.getElementById('currentDanmakuApi').textContent = API_BASE_URL;
+            
+            // 添加弹幕区域设置
+            const settingsTab = document.querySelector('.danmaku-tab-content[data-tab="settings"]');
+            if (settingsTab && !document.getElementById('danmakuAreaControl')) {
+                const areaControl = document.createElement('div');
+                areaControl.className = 'flex items-center gap-2';
+                areaControl.innerHTML = `
+                    <span>弹幕区域</span>
+                    <input type="range" id="danmakuArea" min="25" max="100" value="${danmakuArea}" class="w-24">
+                    <span id="areaValue">${danmakuArea}%</span>
+                `;
+                
+                // 将区域控制添加到设置面板
+                const danmakuControls = settingsTab.querySelector('.danmaku-controls');
+                if (danmakuControls) {
+                    danmakuControls.appendChild(areaControl);
+                    
+                    // 添加事件监听器
+                    document.getElementById('danmakuArea').addEventListener('input', function(e) {
+                        danmakuArea = parseInt(e.target.value);
+                        document.getElementById('areaValue').textContent = `${danmakuArea}%`;
+                        
+                        if (dp && dp.danmaku) {
+                            // 设置弹幕显示区域 - 直接使用CSS方式控制，不调用不存在的方法
+                            // 通过CSS变量设置，增加兼容性
+                            document.documentElement.style.setProperty('--dplayer-danmaku-area', `${danmakuArea}%`);
+                            
+                            // 给弹幕容器添加自定义样式
+                            const container = document.querySelector('.dplayer-danmaku');
+                            if (container) {
+                                container.style.height = `${danmakuArea}%`;
+                                container.classList.add('custom-danmaku-size');
+                            }
+                        }
+                        
+                        localStorage.setItem('danmakuArea', danmakuArea.toString());
+                    });
+                }
+            }
+
+            // 弹幕标签切换
+            document.querySelectorAll('.danmaku-tab').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    const tabName = this.getAttribute('data-tab');
+                    
+                    // 移除所有标签的active类
+                    document.querySelectorAll('.danmaku-tab').forEach(t => {
+                        t.classList.remove('active');
+                    });
+                    
+                    // 移除所有内容的active类
+                    document.querySelectorAll('.danmaku-tab-content').forEach(c => {
+                        c.classList.remove('active');
+                    });
+                    
+                    // 为当前标签和内容添加active类
+                    this.classList.add('active');
+                    document.querySelector(`.danmaku-tab-content[data-tab="${tabName}"]`).classList.add('active');
+                });
+            });
+
+            // 弹幕搜索源选择
+            document.getElementById('danmakuSource').addEventListener('change', function(e) {
+                currentDanmakuSource = e.target.value;
+                // 清空之前的搜索结果
+                document.getElementById('danmakuVideoList').innerHTML = '';
+                document.getElementById('danmakuVideoList').classList.add('hidden');
+                document.getElementById('danmakuEpisodeList').innerHTML = '';
+                document.getElementById('danmakuEpisodeList').classList.add('hidden');
+                document.getElementById('danmakuStatus').textContent = '';
+            });
+
+            // 弹幕搜索按钮
+            document.getElementById('danmakuSearchBtn').addEventListener('click', function() {
+                const keyword = document.getElementById('danmakuSearchInput').value.trim();
+                if (keyword) {
+                    searchDanmaku(keyword);
+                }
+            });
+
+            // 弹幕搜索输入框回车事件
+            document.getElementById('danmakuSearchInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    const keyword = this.value.trim();
+                    if (keyword) {
+                        searchDanmaku(keyword);
+                    }
+                }
+            });
+
+            // 默认填入当前视频标题
+            document.getElementById('danmakuSearchInput').value = currentVideoTitle;
+            
+            // 添加CSS样式以支持弹幕大小和区域自定义
+            const customStyle = document.createElement('style');
+            customStyle.textContent = `
+                :root {
+                    --dplayer-danmaku-font-size: ${danmakuSize}px;
+                    --dplayer-danmaku-area: ${danmakuArea}%;
+                    --dplayer-danmaku-speed-scale: ${danmakuSpeed};
+                }
+                
+                .dplayer-danmaku .dplayer-danmaku-item {
+                    font-size: var(--dplayer-danmaku-font-size) !important;
+                    transition: font-size 0.3s ease;
+                }
+                
+                .dplayer-danmaku.custom-danmaku-size {
+                    margin-top: 0 !important;
+                    height: var(--dplayer-danmaku-area) !important;
+                }
+            `;
+            document.head.appendChild(customStyle);
+        }
+
+        // 切换弹幕显示状态
+        function toggleDanmaku(enabled) {
+            danmakuEnabled = enabled;
+            if (dp && dp.danmaku) {
+                if (enabled) {
+                    dp.danmaku.show();
+                } else {
+                    dp.danmaku.hide();
+                }
+            }
+            
+            // 保存设置
+            localStorage.setItem('danmakuEnabled', enabled.toString());
+        }
+
+        // 初始化弹幕轨道状态
+        function initDanmakuTracks() {
+            danmakuTrackStatus = Array(danmakuTracks).fill(false); // false表示轨道空闲
+        }
+
+        // 切换弹幕面板显示状态
+        function toggleDanmakuPanel() {
+            const panel = document.getElementById('danmakuPanel');
+            if (panel.style.display === 'flex') {
+                panel.style.display = 'none';
+                danmakuPanelVisible = false;
+            } else {
+                panel.style.display = 'flex';
+                danmakuPanelVisible = true;
+            }
+        }
+
+        // 加载弹幕数据 - 改为手动控制方式
+        function loadDanmakuData(danmakus) {
+            try {
+                // 清空已有弹幕列表和显示状态
+                danmakuList = [];
+                danmakuDisplayed = {};
+                
+                if (dp && dp.danmaku) {
+                    // 清空DPlayer现有弹幕
+                    dp.danmaku.clear();
+                }
+                
+                // 将弹幕按时间排序，并存储到内存中
+                danmakuList = danmakus.map(item => {
+                    // 提取时间和内容
+                    const time = (item.time || item.timepoint || 0); // 保留毫秒单位
+                    const text = item.text || item.content || '';
+                    // 使用item中的颜色或默认颜色
+                    let color = item.color || 16777215; // 默认白色
+                    
+                    // 返回格式化的弹幕对象
+                    return {
+                        time: time,  
+                        text: text,
+                        type: 0,     // 滚动弹幕
+                        color: color,
+                        displayed: false // 是否已显示
+                    };
+                }).filter(item => item.text.trim() !== ''); // 过滤空弹幕
+                
+                // 按时间排序
+                danmakuList.sort((a, b) => a.time - b.time);
+                
+                // 显示加载成功信息
+                console.log(`已加载 ${danmakuList.length} 条弹幕到内存，准备按时间显示`);
+                console.log(`弹幕时间范围: ${danmakuList[0]?.time}ms - ${danmakuList[danmakuList.length-1]?.time}ms`);
+                
+                // 设置视频timeupdate事件监听器
+                setupDanmakuTimeListener();
+                
+                return true;
+            } catch (e) {
+                console.error('加载弹幕数据失败', e);
+                return false;
+            }
+        }
+        
+        // 设置视频时间监听器，用于显示弹幕
+        function setupDanmakuTimeListener() {
+            if (!dp || !dp.video) {
+                console.warn('播放器未初始化，无法设置弹幕时间监听');
+                return;
+            }
+            
+            // 移除现有监听器，防止重复监听
+            dp.video.removeEventListener('timeupdate', checkDanmakuDisplay);
+            
+            // 添加新的监听器
+            dp.video.addEventListener('timeupdate', checkDanmakuDisplay);
+            console.log('已设置弹幕时间监听器');
+        }
+        
+        // 检查并显示当前时间点的弹幕
+        function checkDanmakuDisplay() {
+            // 如果未启用弹幕或者播放器未初始化，不处理
+            if (!danmakuEnabled || !dp || !dp.video || !dp.danmaku) return;
+            
+            // 获取当前播放时间（秒）
+            const currentTime = dp.video.currentTime;
+            
+            // 如果时间变化很小，可以跳过处理（提高性能）
+            if (Math.abs(currentTime - lastCheckedTime) < 0.1) return;
+            lastCheckedTime = currentTime;
+            
+            // 弹幕时间窗口 (前后0.5秒) - 应用时间偏移
+            const adjustedTime = currentTime - danmakuTimeOffset; // 负值是提前，正值是延后
+            const timeWindowStart = (adjustedTime * 1000) - 500;
+            const timeWindowEnd = (adjustedTime * 1000) + 500;
+            
+            // 批量收集符合条件的弹幕，然后一次性添加，提高性能
+            const matchedDanmakus = [];
+            
+            danmakuList.forEach((danmaku, index) => {
+                // 只处理未显示过且时间在窗口内的弹幕
+                if (!danmaku.displayed && 
+                    danmaku.time >= timeWindowStart && 
+                    danmaku.time <= timeWindowEnd) {
+                    
+                    // 标记为已显示
+                    danmaku.displayed = true;
+                    
+                    // 确定弹幕颜色
+                    let color;
+                    if (danmakuColor === 'random') {
+                        color = getRandomColor();
+                    } else {
+                        // 使用用户设置的颜色 或 原有弹幕颜色
+                        color = danmakuColor || (danmaku.color ? '#' + danmaku.color.toString(16).padStart(6, '0') : '#ffffff');
+                    }
+                    
+                    // 转换颜色为十六进制值
+                    let colorValue = color;
+                    if (color.startsWith('#')) {
+                        colorValue = parseInt(color.slice(1), 16);
+                    }
+                    
+                    // 添加到匹配列表
+                    matchedDanmakus.push({
+                        text: danmaku.text,
+                        color: colorValue,
+                        type: danmaku.type || 0
+                    });
+                }
+            });
+            
+            // 一次性批量添加弹幕，提高性能
+            if (matchedDanmakus.length > 0) {
+                // 使用requestAnimationFrame确保在下一帧渲染，避免卡顿
+                requestAnimationFrame(() => {
+                    matchedDanmakus.forEach(danmaku => {
+                        dp.danmaku.draw(danmaku);
+                    });
+                    
+                    // 调试用，显示弹幕数量
+                    if (matchedDanmakus.length % 10 === 0) {
+                        console.log(`时间${currentTime.toFixed(2)}秒，显示了${matchedDanmakus.length}条弹幕`);
+                    }
+                });
+            }
         }
 
         // 处理键盘快捷键
@@ -538,6 +1270,405 @@
                     showShortcutHint('下一集', 'right');
                     e.preventDefault();
                 }
+            }
+
+            // D键 = 切换弹幕显示状态
+            if (e.key === 'd' || e.key === 'D') {
+                const toggle = document.getElementById('danmakuToggle');
+                toggle.checked = !toggle.checked;
+                toggleDanmaku(toggle.checked);
+                e.preventDefault();
+            }
+
+            // P键 = 切换弹幕面板
+            if (e.key === 'p' || e.key === 'P') {
+                toggleDanmakuPanel();
+                e.preventDefault();
+            }
+            
+            // 弹幕时间偏移调整: [ 向前偏移1秒, ] 向后偏移1秒
+            if (e.key === '[') {
+                adjustDanmakuTimeOffset(-1);
+                e.preventDefault();
+            }
+            if (e.key === ']') {
+                adjustDanmakuTimeOffset(1);
+                e.preventDefault();
+            }
+            
+            // Shift + [/] 快速调整10秒
+            if (e.shiftKey && e.key === '{') {
+                adjustDanmakuTimeOffset(-10);
+                e.preventDefault();
+            }
+            if (e.shiftKey && e.key === '}') {
+                adjustDanmakuTimeOffset(10);
+                e.preventDefault();
+            }
+        }
+
+        // 调整弹幕时间偏移量
+        function adjustDanmakuTimeOffset(change) {
+            let newOffset = danmakuTimeOffset + change;
+            
+            // 限制范围
+            if (newOffset < -60) newOffset = -60;
+            if (newOffset > 60) newOffset = 60;
+            
+            // 更新UI控件
+            const slider = document.getElementById('danmakuTimeOffsetSlider');
+            const input = document.getElementById('danmakuTimeOffsetInput');
+            if (slider && input) {
+                slider.value = newOffset;
+                input.value = newOffset;
+            }
+            
+            // 应用新的偏移设置
+            updateDanmakuTimeOffset(newOffset);
+        }
+
+        // 搜索弹幕
+        function searchDanmaku(keyword) {
+            // 防止频繁请求
+            const now = Date.now();
+            if (now - lastRequestTime < 1000 || loadingDanmaku) {
+                return;
+            }
+            lastRequestTime = now;
+            loadingDanmaku = true;
+
+            // 显示加载状态
+            document.getElementById('danmakuStatus').textContent = '正在搜索...';
+            
+            // 发送请求到服务器，使用API_BASE_URL变量
+            const source = currentDanmakuSource;
+            fetch(`${API_BASE_URL}/api/danmaku/search?keyword=${encodeURIComponent(keyword)}&source=${encodeURIComponent(source)}`)
+                .then(response => response.json())
+                .then(data => {
+                    loadingDanmaku = false;
+                    if (data.code === 200 && data.videos && data.videos.length > 0) {
+                        // 更新视频列表
+                        const videoList = document.getElementById('danmakuVideoList');
+                        videoList.innerHTML = '';
+                        videoList.classList.remove('hidden');
+                        document.getElementById('danmakuEpisodeList').classList.add('hidden');
+                        
+                        data.videos.forEach(video => {
+                            const item = document.createElement('div');
+                            item.className = 'danmaku-item';
+                            item.textContent = video.title;
+                            item.setAttribute('data-id', video.id);
+                            item.addEventListener('click', function() {
+                                // 获取视频集数
+                                getDanmakuEpisodes(video.id, keyword);
+                            });
+                            videoList.appendChild(item);
+                        });
+
+                        document.getElementById('danmakuStatus').textContent = `找到 ${data.videos.length} 个视频`;
+                    } else {
+                        document.getElementById('danmakuStatus').textContent = data.message || '未找到相关视频';
+                        document.getElementById('danmakuVideoList').classList.add('hidden');
+                    }
+                })
+                .catch(error => {
+                    loadingDanmaku = false;
+                    console.error('搜索弹幕失败:', error);
+                    document.getElementById('danmakuStatus').textContent = '搜索失败，请稍后重试';
+                });
+        }
+
+        // 获取弹幕集数
+        function getDanmakuEpisodes(videoId, keyword) {
+            if (loadingDanmaku) return;
+            loadingDanmaku = true;
+
+            document.getElementById('danmakuStatus').textContent = '正在获取集数...';
+            
+            // 发送请求到服务器，使用API_BASE_URL变量
+            const source = currentDanmakuSource;
+            
+            // 构建查询参数
+            let queryParams = `videoId=${encodeURIComponent(videoId)}&source=${encodeURIComponent(source)}`;
+            
+            // 对所有平台都传递keyword参数，确保API可以正常工作
+            if (keyword) {
+                queryParams += `&keyword=${encodeURIComponent(keyword)}`;
+            }
+            
+            fetch(`${API_BASE_URL}/api/danmaku/episodes?${queryParams}`)
+                .then(response => response.json())
+                .then(data => {
+                    loadingDanmaku = false;
+                    if (data.code === 200 && data.episodes && data.episodes.length > 0) {
+                        // 更新集数列表
+                        const episodeList = document.getElementById('danmakuEpisodeList');
+                        episodeList.innerHTML = '';
+                        episodeList.classList.remove('hidden');
+                        
+                        data.episodes.forEach(episode => {
+                            const item = document.createElement('div');
+                            item.className = 'danmaku-item';
+                            item.textContent = episode.title;
+                            item.setAttribute('data-id', episode.id);
+                            item.addEventListener('click', function() {
+                                // 下载弹幕
+                                downloadDanmaku(episode.id, keyword);
+                            });
+                            episodeList.appendChild(item);
+                        });
+
+                        document.getElementById('danmakuStatus').textContent = `找到 ${data.episodes.length} 个集数`;
+                    } else {
+                        document.getElementById('danmakuStatus').textContent = data.message || '未找到集数信息';
+                        document.getElementById('danmakuEpisodeList').classList.add('hidden');
+                    }
+                })
+                .catch(error => {
+                    loadingDanmaku = false;
+                    console.error('获取集数失败:', error);
+                    document.getElementById('danmakuStatus').textContent = '获取集数失败，请稍后重试';
+                });
+        }
+
+        // 下载弹幕
+        function downloadDanmaku(danmakuId, keyword) {
+            if (loadingDanmaku) return;
+            loadingDanmaku = true;
+
+            document.getElementById('danmakuStatus').textContent = '正在下载弹幕...';
+            
+            // 发送请求到服务器，使用API_BASE_URL变量
+            const source = currentDanmakuSource;
+            let queryParams = `danmakuId=${encodeURIComponent(danmakuId)}&source=${encodeURIComponent(source)}`;
+            
+            // 同样传递keyword参数
+            if (keyword) {
+                queryParams += `&keyword=${encodeURIComponent(keyword)}`;
+            }
+            
+            console.log(`下载弹幕，参数: ${queryParams}`);
+            
+            // 对于爱奇艺，如果danmakuId包含qipuId属性，优先使用它
+            if (source === '奇异' && typeof danmakuId === 'object' && danmakuId.qipuId) {
+                console.log('检测到爱奇艺qipuId属性，使用qipuId下载弹幕');
+                queryParams = `danmakuId=${encodeURIComponent(danmakuId.qipuId)}&source=${encodeURIComponent(source)}`;
+                if (keyword) {
+                    queryParams += `&keyword=${encodeURIComponent(keyword)}`;
+                }
+            }
+            
+            fetch(`${API_BASE_URL}/api/danmaku/download?${queryParams}`)
+                .then(response => response.json())
+                .then(data => {
+                    loadingDanmaku = false;
+                    if (data.code === 200 && data.danmakus && data.danmakus.length > 0) {
+                        // 加载弹幕数据 - 在控制台输出前5条弹幕数据用于调试
+                        console.log("弹幕数据结构示例:", JSON.stringify(data.danmakus.slice(0, 2)));
+                        console.log(`获取到 ${data.danmakus.length} 条弹幕`);
+                        
+                        // 根据CSV格式确保弹幕数据包含必要的字段
+                        // 在这里我们确保每条弹幕都有 timepoint/time 和 content/text 字段
+                        const processedDanmakus = data.danmakus.map(item => {
+                            // 确保弹幕有正确的时间字段
+                            if (item.timepoint !== undefined && item.time === undefined) {
+                                item.time = parseInt(item.timepoint);
+                            } else if (item.time !== undefined && item.timepoint === undefined) {
+                                item.timepoint = parseInt(item.time);
+                            }
+                            
+                            // 确保弹幕有正确的内容字段
+                            if (item.content !== undefined && item.text === undefined) {
+                                item.text = item.content;
+                            } else if (item.text !== undefined && item.content === undefined) {
+                                item.content = item.text;
+                            }
+                            
+                            return item;
+                        });
+                        
+                        // 加载处理后的弹幕数据
+                        loadDanmakuData(processedDanmakus);
+                        document.getElementById('danmakuStatus').textContent = `成功加载 ${data.danmakus.length} 条弹幕`;
+                        
+                        // 自动关闭面板
+                        setTimeout(() => {
+                            toggleDanmakuPanel();
+                        }, 1500);
+                    } else {
+                        document.getElementById('danmakuStatus').textContent = data.message || '未找到弹幕数据';
+                    }
+                })
+                .catch(error => {
+                    loadingDanmaku = false;
+                    console.error('下载弹幕失败:', error);
+                    document.getElementById('danmakuStatus').textContent = '下载弹幕失败，请稍后重试';
+                });
+        }
+
+        // 在当前时间点显示弹幕
+        function showDanmakuAtCurrentTime() {
+            if (!dp || !dp.video) return;
+            
+            const currentTime = dp.video.currentTime * 1000; // 转换为毫秒
+            const adjustedTime = currentTime - (danmakuTimeOffset * 1000); // 应用时间偏移（毫秒）
+            
+            // 搜索需要显示的弹幕
+            danmakuList.forEach(danmaku => {
+                // 检查弹幕时间是否匹配当前播放时间点（允许±500毫秒的误差）
+                if (Math.abs(danmaku.time - adjustedTime) <= 500 && !danmaku.shown) {
+                    // 标记为已显示
+                    danmaku.shown = true;
+                    // 显示弹幕
+                    showDanmaku(danmaku.text, danmaku.color);
+                }
+            });
+        }
+
+        // 显示单条弹幕
+        function showDanmaku(text, color = '#FFFFFF') {
+            if (!danmakuEnabled) return;
+            
+            const container = document.getElementById('danmakuContainer');
+            const trackIndex = getAvailableTrack();
+            
+            // 如果没有可用轨道，丢弃该弹幕
+            if (trackIndex === -1) return;
+            
+            // 创建弹幕元素
+            const danmaku = document.createElement('div');
+            danmaku.className = 'danmaku';
+            danmaku.textContent = text;
+            danmaku.style.color = color;
+            danmaku.style.top = `${trackIndex * (danmakuSize + 5)}px`; // 计算垂直位置
+            danmaku.style.fontSize = `${danmakuSize}px`; // 设置字体大小
+            danmaku.style.opacity = danmakuOpacity; // 设置透明度
+            
+            // 计算动画时间
+            const duration = 8 / danmakuSpeed; // 默认8秒，根据速度调整
+            danmaku.style.animationDuration = `${duration}s`;
+            
+            // 将弹幕添加到容器
+            container.appendChild(danmaku);
+            
+            // 标记轨道为占用
+            danmakuTrackStatus[trackIndex] = true;
+            
+            // 监听动画结束事件
+            danmaku.addEventListener('animationend', () => {
+                // 移除弹幕元素
+                container.removeChild(danmaku);
+                // 释放轨道
+                danmakuTrackStatus[trackIndex] = false;
+            });
+        }
+
+        // 获取可用的弹幕轨道
+        function getAvailableTrack() {
+            for (let i = 0; i < danmakuTrackStatus.length; i++) {
+                if (!danmakuTrackStatus[i]) {
+                    return i;
+                }
+            }
+            return -1; // 没有可用轨道
+        }
+
+        // 设置弹幕的时间偏移量
+        function setDanmakuTimeOffset(seconds) {
+            danmakuTimeOffset = seconds;
+            // 保存到localStorage
+            localStorage.setItem('danmakuTimeOffset', seconds.toString());
+            // 重置所有弹幕的显示状态
+            danmakuList.forEach(danmaku => {
+                danmaku.displayed = false;
+            });
+            
+            // 在控制台打印调试信息
+            console.log(`已设置弹幕时间偏移: ${seconds}秒`);
+            
+            // 清除现有弹幕显示
+            if (dp && dp.danmaku) {
+                dp.danmaku.clear();
+            }
+        }
+
+        // 更新弹幕时间偏移值
+        function updateDanmakuTimeOffset(seconds) {
+            // 更新偏移量
+            danmakuTimeOffset = seconds;
+            // 保存到localStorage
+            localStorage.setItem('danmakuTimeOffset', seconds.toString());
+            
+            // 清除和重置弹幕显示状态
+            danmakuList.forEach(danmaku => {
+                danmaku.displayed = false;
+            });
+            lastCheckedTime = 0;
+            
+            // 清除现有弹幕显示
+            if (dp && dp.danmaku) {
+                dp.danmaku.clear();
+            }
+            
+            // 显示提示
+            showToast(`弹幕时间${seconds > 0 ? '延迟' : '提前'}${Math.abs(seconds)}秒`, 'info', 1500);
+        }
+
+        // 处理键盘快捷键
+        function handleKeyboardShortcuts(e) {
+            // 忽略输入框中的按键事件
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+            // Alt + 左箭头 = 上一集
+            if (e.altKey && e.key === 'ArrowLeft') {
+                if (currentEpisodeIndex > 0) {
+                    playPreviousEpisode();
+                    showShortcutHint('上一集', 'left');
+                    e.preventDefault();
+                }
+            }
+            
+            // Alt + 右箭头 = 下一集
+            if (e.altKey && e.key === 'ArrowRight') {
+                if (currentEpisodeIndex < currentEpisodes.length - 1) {
+                    playNextEpisode();
+                    showShortcutHint('下一集', 'right');
+                    e.preventDefault();
+                }
+            }
+
+            // D键 = 切换弹幕显示状态
+            if (e.key === 'd' || e.key === 'D') {
+                const toggle = document.getElementById('danmakuToggle');
+                toggle.checked = !toggle.checked;
+                toggleDanmaku(toggle.checked);
+                e.preventDefault();
+            }
+
+            // P键 = 切换弹幕面板
+            if (e.key === 'p' || e.key === 'P') {
+                toggleDanmakuPanel();
+                e.preventDefault();
+            }
+            
+            // 弹幕时间偏移调整: [ 向前偏移1秒, ] 向后偏移1秒
+            if (e.key === '[') {
+                adjustDanmakuTimeOffset(-1);
+                e.preventDefault();
+            }
+            if (e.key === ']') {
+                adjustDanmakuTimeOffset(1);
+                e.preventDefault();
+            }
+            
+            // Shift + [/] 快速调整10秒
+            if (e.shiftKey && e.key === '{') {
+                adjustDanmakuTimeOffset(-10);
+                e.preventDefault();
+            }
+            if (e.shiftKey && e.key === '}') {
+                adjustDanmakuTimeOffset(10);
+                e.preventDefault();
             }
         }
 
@@ -573,6 +1704,27 @@
         // 初始化播放器
         function initPlayer(videoUrl, sourceCode) {
             if (!videoUrl) return;
+
+            // 为弹幕系统生成唯一标识符
+            let danmakuId = '';
+            try {
+                // 尝试从URL中提取视频ID
+                const urlObj = new URL(videoUrl);
+                danmakuId = urlObj.pathname.split('/').filter(Boolean).pop() || '';
+                // 如果获取不到，使用视频标题
+                if (!danmakuId || danmakuId === 'index.m3u8') {
+                    danmakuId = currentVideoTitle;
+                }
+            } catch (e) {
+                console.warn('无法从URL解析视频ID，使用标题作为ID', e);
+                danmakuId = currentVideoTitle;
+            }
+            
+            // 确保存在弹幕ID
+            if (!danmakuId) {
+                danmakuId = `video_${Date.now()}`;
+            }
+            console.log('弹幕ID:', danmakuId);
 
             // 配置HLS.js选项
             const hlsConfig = {
@@ -618,7 +1770,81 @@
                 preventClickToggle: false,       // 允许点击视频切换播放/暂停
                 airplay: true,                   // 在Safari中启用AirPlay功能
                 chromecast: true,                // 启用Chromecast投屏功能
+                danmaku: {                      // 使用DPlayer官方的弹幕配置
+                    id: danmakuId,              // 使用生成的弹幕ID
+                    api: `${API_BASE_URL}/api/dplayer/`,  // 弹幕API端点
+                    maximum: 1000,              // 最大弹幕数量
+                    user: 'guest',              // 默认用户名
+                    margin: [10, '25%'],        // 弹幕与容器边界的距离
+                    opacity: 0.8,               // 弹幕透明度
+                    speedRate: 1.0              // 弹幕速度
+                },
                 contextmenu: [                   // 自定义右键菜单
+                    {
+                        text: '弹幕设置',
+                        click: (player) => {
+                            toggleDanmakuPanel();
+                        }
+                    },
+                    {
+                        text: danmakuEnabled ? '隐藏弹幕' : '显示弹幕',
+                        click: (player) => {
+                            const toggle = document.getElementById('danmakuToggle');
+                            toggle.checked = !toggle.checked;
+                            toggleDanmaku(toggle.checked);
+                            
+                            // 更新菜单项文本
+                            player.contextmenu.contextmenu[1].text = toggle.checked ? '隐藏弹幕' : '显示弹幕';
+                            
+                            // 重新显示右键菜单以更新文本
+                            setTimeout(() => {
+                                player.contextmenu.hide();
+                                player.contextmenu.show(200, 200);
+                            }, 100);
+                        }
+                    },
+                    {
+                        text: '清空弹幕缓存',
+                        click: (player) => {
+                            clearDanmakuCache();
+                        }
+                    },
+                    {
+                        text: '弹幕时间校准',
+                        click: (player) => {
+                            // 打开弹幕面板并切换到设置标签页
+                            const panel = document.getElementById('danmakuPanel');
+                            panel.style.display = 'flex';
+                            
+                            // 激活设置标签
+                            document.querySelectorAll('.danmaku-tab').forEach(t => {
+                                t.classList.remove('active');
+                            });
+                            document.querySelectorAll('.danmaku-tab-content').forEach(c => {
+                                c.classList.remove('active');
+                            });
+                            
+                            // 激活设置标签
+                            document.querySelector('.danmaku-tab[data-tab="settings"]').classList.add('active');
+                            document.querySelector('.danmaku-tab-content[data-tab="settings"]').classList.add('active');
+                            
+                            // 聚焦到时间偏移设置
+                            document.getElementById('danmakuTimeOffsetSlider').focus();
+                            
+                            // 添加高亮效果
+                            const timeOffsetControl = document.getElementById('danmakuTimeOffsetSlider').parentNode;
+                            timeOffsetControl.classList.add('highlight-setting');
+                            setTimeout(() => {
+                                timeOffsetControl.classList.remove('highlight-setting');
+                            }, 2000);
+                        }
+                    },
+                    {
+                        text: '当前弹幕API',
+                        click: (player) => {
+                            showToast(`API地址: ${API_BASE_URL}`, 'info', 5000);
+                        }
+                    },
                     {
                         text: '关于 LibreTV',
                         link: 'https://github.com/bestzwei/LibreTV'
@@ -1057,6 +2283,15 @@
                 <div class="loading-spinner"></div>
                 <div>正在加载视频...</div>
             `;
+            
+            // 清除之前视频的弹幕
+            if (dp && dp.danmaku) {
+                dp.danmaku.clear();
+            }
+            // 清空弹幕列表和显示状态
+            danmakuList = [];
+            danmakuDisplayed = {};
+            lastCheckedTime = 0;
             
             const url = currentEpisodes[index];
             currentEpisodeIndex = index;
@@ -1569,6 +2804,113 @@
             icon.innerHTML = controlsLocked
                 ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d=\"M12 15v2m0-8V7a4 4 0 00-8 0v2m8 0H4v8h16v-8h-4z\"/>'
                 : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d=\"M15 11V7a3 3 0 00-6 0v4m-3 4h12v6H6v-6z\"/>';
+        }
+
+        // 在播放器初始化后应用弹幕自定义设置
+        function applyDanmakuCustomSettings() {
+            if (!dp || !dp.danmaku) return;
+            
+            // 设置弹幕透明度
+            dp.danmaku.opacity(danmakuOpacity);
+            
+            // 设置弹幕区域 - 使用CSS方式，而非不存在的API
+            document.documentElement.style.setProperty('--dplayer-danmaku-font-size', `${danmakuSize}px`);
+            document.documentElement.style.setProperty('--dplayer-danmaku-area', `${danmakuArea}%`);
+            
+            // 给弹幕容器添加自定义类
+            setTimeout(() => {
+                const container = document.querySelector('.dplayer-danmaku');
+                if (container) {
+                    container.style.height = `${danmakuArea}%`;
+                    container.classList.add('custom-danmaku-size');
+                }
+                
+                // 设置发送弹幕时的颜色选择器颜色
+                const colorPicker = document.querySelector('.dplayer-comment-setting-color');
+                if (colorPicker) {
+                    if (danmakuColor === 'random') {
+                        colorPicker.style.backgroundColor = getRandomColor();
+                    } else {
+                        colorPicker.style.backgroundColor = danmakuColor;
+                    }
+                }
+                
+                // 监听弹幕发送框打开事件，设置默认颜色
+                const commentShow = document.querySelector('.dplayer-comment-show');
+                if (commentShow) {
+                    const observer = new MutationObserver(function(mutations) {
+                        mutations.forEach(function(mutation) {
+                            if (mutation.attributeName === 'style' && 
+                                commentShow.style.display !== 'none') {
+                                // 弹幕框显示时，设置颜色
+                                const colorPicker = document.querySelector('.dplayer-comment-setting-color');
+                                if (colorPicker) {
+                                    if (danmakuColor === 'random') {
+                                        colorPicker.style.backgroundColor = getRandomColor();
+                                    } else {
+                                        colorPicker.style.backgroundColor = danmakuColor;
+                                    }
+                                }
+                            }
+                        });
+                    });
+                    observer.observe(commentShow, { attributes: true });
+                }
+            }, 500);
+            
+            // 应用弹幕显示状态
+            if (danmakuEnabled) {
+                dp.danmaku.show();
+            } else {
+                dp.danmaku.hide();
+            }
+        }
+
+        // 添加生成随机颜色的函数
+        function getRandomColor() {
+            const colors = [
+                '#ffffff', // 白色
+                '#fcd34d', // 黄色
+                '#ef4444', // 红色
+                '#4ade80', // 绿色
+                '#60a5fa', // 蓝色
+                '#c084fc'  // 紫色
+            ];
+            // 随机返回一个颜色或生成完全随机颜色
+            if (Math.random() > 0.5) {
+                return colors[Math.floor(Math.random() * colors.length)];
+            } else {
+                return '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0');
+            }
+        }
+
+        // 添加showToast函数，如果页面中没有
+        function showToast(message, type = 'error', duration = 3000) {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toastMessage');
+            
+            if (!toast || !toastMessage) {
+                console.error('找不到Toast元素，无法显示消息');
+                return;
+            }
+            
+            // 设置消息类型
+            toast.className = 'fixed top-4 left-1/2 -translate-x-1/2 px-6 py-3 rounded-lg shadow-lg transform transition-all duration-300 z-50';
+            toast.classList.add(type); // 添加类型样式: success, error, info
+            
+            // 设置消息内容
+            toastMessage.textContent = message;
+            
+            // 显示Toast
+            toast.style.opacity = '1';
+            toast.style.transform = 'translate(-50%, 0)';
+            
+            // 定时隐藏
+            clearTimeout(window.toastTimeout);
+            window.toastTimeout = setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translate(-50%, -100%)';
+            }, duration);
         }
     </script>
 </body>
