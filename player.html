@@ -6,12 +6,13 @@
     <title>LibreTV 播放器</title>
 
     <!-- Favicon -->
-    <link rel="icon" href="https://images.icon-icons.com/38/PNG/512/retrotv_5520.png">
-    <link rel="apple-touch-icon" href="https://images.icon-icons.com/38/PNG/512/retrotv_5520.png">
+    <link rel="icon" href="./image/retrotv_5520.png">
+    <link rel="apple-touch-icon" href="./image/retrotv_5520.png">
     <link rel="manifest" href="manifest.json">
 
     <script src="libs/tailwindcss.min.js"></script>
     <script src="js/wakelock.js"></script>
+    <script src="js/version-check.js"></script>
     <link rel="stylesheet" href="css/styles.css">
     <style>
         body, html {
@@ -304,12 +305,12 @@
             </a>
         </div>
         <h2 id="videoTitle" class="text-xl font-semibold flex-1 text-center overflow-x-auto whitespace-nowrap truncate custom-title-scroll"></h2>
-        <a href="/" class="px-4 py-2 bg-[#222] hover:bg-[#333] border border-[#333] rounded-lg transition-colors flex items-center min-w-0 home-btn">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M19 21V9.5l-7-5-7 5V21a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2z" />
-              <path d="M9 22V12h6v10" />
+        <a href="#" id="goBack" onclick="goBack(event)" class="px-4 py-2 bg-[#222] hover:bg-[#333] border border-[#333] rounded-lg transition-colors flex items-center min-w-0 home-btn">
+            <svg class="w-5 h-5 mr-1" viewBox="0 0 24 24" fill="#ffffff" xmlns="http://www.w3.org/2000/svg">
+                <path d="M5.25 11h15a1.5 1.5 0 1 1 0 3H5.25a1.5 1.5 0 0 1 0-3z"/>
+                <path d="M5.55 12 11.3 17.3a1.5 1.5 0 1 1-2.12 2.12L3 12l6.18-6.18a1.5 1.5 0 1 1 2.12 2.12L5.55 12z"/>
             </svg>
-            <span class="home-btn-text">返回首页</span>
+            <span class="home-btn-text">上一页</span>
         </a>
     </header>
 
@@ -461,7 +462,7 @@
         </div>
 
         <!-- 添加自动播放开关和排序按钮 -->
-        <div class="player-container">
+        <div class="player-container mb-2">
             <div class="flex flex-wrap justify-end items-center gap-2">
                 <!-- 自动连播开关 - 分组到左边 -->
                 <div class="flex items-center gap-1 flex-shrink-0 mr-auto">
@@ -501,7 +502,7 @@
                     <!-- 锁定控制按钮 - 始终显示在最右侧 -->
                     <button id="lockToggle" onclick="toggleControlsLock()" title="锁定控制" 
                             class="px-2 py-1 bg-[#222] hover:bg-[#333] border border-[#333] text-white rounded-lg transition flex-shrink-0">
-                        <svg id="lockIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg id="lockIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <!-- 默认状态：未锁图标 -->
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M15 11V7a3 3 0 00-6 0v4m-3 4h12v6H6v-6z" />
@@ -548,6 +549,7 @@
     <script src="js/config.js"></script>
     <script src="js/password.js"></script>
     <script src="js/ui.js"></script>
+    <script src="js/player.js"></script>
 
     <script>
         // 创建全局环境变量对象
