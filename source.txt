@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="zh">
 <head>
@@ -202,8 +203,6 @@
             display: none;
             flex-direction: column;
             gap: 10px;
-            max-height: 400px;
-            overflow-y: auto;
         }
         .danmaku-controls {
             display: flex;
@@ -219,6 +218,7 @@
         .danmaku-list {
             max-height: 150px;
             overflow-y: auto;
+            border: 1px solid #333;
             border-radius: 5px;
             padding: 5px;
         }
@@ -436,7 +436,7 @@
                     
                     <!-- 添加API信息显示 -->
                     <div class="danmaku-api-info">
-                        当前弹幕API地址: <span id="currentDanmakuApi"></span>
+                        当前弹幕API地址: <span id="currentDanmakuApi">http://152.136.12.42:5005</span>
                         <div class="text-xs mt-1">可在首页设置中修改API地址</div>
                     </div>
                 </div>
@@ -492,7 +492,7 @@
                     </button>
                     
                     <!-- 弹幕按钮 -->
-                    <button id="danmakuBtn" onclick="toggleDanmakuPanel()" title="弹幕设置" 
+                    <button id="danmakuBtn" onclick="window.toggleDanmakuPanel()" title="弹幕设置"
                             class="px-2 py-1 bg-[#222] hover:bg-[#333] border border-[#333] text-white rounded-lg transition">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
@@ -550,8 +550,7 @@
     <script src="js/config.js"></script>
     <script src="js/password.js"></script>
     <script src="js/ui.js"></script>
-    <!-- player.js 已集成到下方 inline script 中，避免重复声明 -->
-    <!-- <script src="js/player.js"></script> -->
+    <script src="js/player.js"></script>
 
     <script>
         // 创建全局环境变量对象
@@ -559,30 +558,29 @@
         
         // 注入服务器端环境变量 (将由服务器端替换)
         // PASSWORD 变量将在这里被服务器端注入
-        window.__ENV__.PASSWORD = "{{PASSWORD}}";
+        window.__ENV__.PASSWORD = "e89c47fe54df11b6ea9b2c55fb2f8e31144e61b46f748a09632a296578c86f93";
 
         // 设置API基础URL变量 - 弹幕服务地址，从localStorage读取，如果没有则使用默认值
-        const API_BASE_URL = localStorage.getItem('danmakuApiUrl') || "http://localhost:5000";
+        const API_BASE_URL = "http://152.136.12.42:5005";
         console.log('弹幕API地址:', API_BASE_URL);
         
         // =================================
         // ============== PLAYER ==========
         // =================================
         // 全局变量
-        let currentVideoTitle = '';
-        let currentEpisodeIndex = 0;
-        let currentEpisodes = [];
-        let episodesReversed = false;
-        let dp = null;
-        let currentHls = null; // 跟踪当前HLS实例
-        let autoplayEnabled = true; // 默认开启自动连播
-        let isUserSeeking = false; // 跟踪用户是否正在拖动进度条
-        let videoHasEnded = false; // 跟踪视频是否已经自然结束
-        let userClickedPosition = null; // 记录用户点击的位置
-        let shortcutHintTimeout = null; // 用于控制快捷键提示显示时间
-        let adFilteringEnabled = true; // 默认开启广告过滤
-        let progressSaveInterval = null; // 定期保存进度的计时器
-        let currentVideoUrl = ''; // 记录当前实际的视频URL
+        currentVideoTitle = '';
+        currentEpisodeIndex = 0;
+        currentEpisodes = [];
+        episodesReversed = false;
+        dp = null;
+        currentHls = null; // 跟踪当前HLS实例
+        autoplayEnabled = true; // 默认开启自动连播
+        isUserSeeking = false; // 跟踪用户是否正在拖动进度条
+        videoHasEnded = false; // 跟踪视频是否已经自然结束
+        userClickedPosition = null; // 记录用户点击的位置
+        shortcutHintTimeout = null; // 用于控制快捷键提示显示时间
+        adFilteringEnabled = true; // 默认开启广告过滤
+        progressSaveInterval = null; // 定期保存进度的计时器
 
         // 弹幕相关变量
         let danmakuEnabled = localStorage.getItem('danmakuEnabled') !== 'false'; // 默认开启
@@ -599,20 +597,8 @@
         let currentDanmakuSource = '企鹅'; // 当前弹幕来源
         let lastRequestTime = 0; // 上次请求时间，用于节流
         let loadingDanmaku = false; // 是否正在加载弹幕
-        let lastCheckedTime = 0; // 上次检查弹幕的视频时间点
-        let danmakuPanelVisible = false; // 弹幕面板是否显示
-
-        // 切换弹幕面板显示状态 - 必须在全局作用域，供 onclick 使用
-        window.toggleDanmakuPanel = function() {
-            const panel = document.getElementById('danmakuPanel');
-            if (panel.style.display === 'flex') {
-                panel.style.display = 'none';
-                danmakuPanelVisible = false;
-            } else {
-                panel.style.display = 'flex';
-                danmakuPanelVisible = true;
-            }
-        }
+        let lastCheckedTime = 0; // last danmaku check timestamp
+        let danmakuPanelVisible = false; // track danmaku panel visibility
 
         // 页面加载
         document.addEventListener('DOMContentLoaded', function() {
@@ -1124,6 +1110,18 @@
             danmakuTrackStatus = Array(danmakuTracks).fill(false); // false表示轨道空闲
         }
 
+        // 切换弹幕面板显示状态
+        window.toggleDanmakuPanel = function() {
+            const panel = document.getElementById('danmakuPanel');
+            if (panel.style.display === 'flex') {
+                panel.style.display = 'none';
+                danmakuPanelVisible = false;
+            } else {
+                panel.style.display = 'flex';
+                danmakuPanelVisible = true;
+            }
+        };
+
         // 加载弹幕数据 - 改为手动控制方式
         function loadDanmakuData(danmakus) {
             try {
@@ -1244,12 +1242,13 @@
                 // 使用requestAnimationFrame确保在下一帧渲染，避免卡顿
                 requestAnimationFrame(() => {
                     matchedDanmakus.forEach(danmaku => {
-                        // 使用 send 方法显示弹幕
-                        dp.danmaku.send(danmaku);
+                        dp.danmaku.draw(danmaku);
                     });
-
+                    
                     // 调试用，显示弹幕数量
-                    console.log(`时间${currentTime.toFixed(2)}秒，显示了${matchedDanmakus.length}条弹幕`);
+                    if (matchedDanmakus.length % 10 === 0) {
+                        console.log(`时间${currentTime.toFixed(2)}秒，显示了${matchedDanmakus.length}条弹幕`);
+                    }
                 });
             }
         }
@@ -2135,49 +2134,6 @@
             })();
         }
 
-        // 自定义M3U8 Loader用于过滤广告
-        class CustomHlsJsLoader extends Hls.DefaultConfig.loader {
-            constructor(config) {
-                super(config);
-                const load = this.load.bind(this);
-                this.load = function(context, config, callbacks) {
-                    // 拦截manifest和level请求
-                    if (context.type === 'manifest' || context.type === 'level') {
-                        const onSuccess = callbacks.onSuccess;
-                        callbacks.onSuccess = function(response, stats, context) {
-                            // 如果是m3u8文件，处理内容以移除广告分段
-                            if (response.data && typeof response.data === 'string') {
-                                // 过滤掉广告段 - 实现更精确的广告过滤逻辑
-                                response.data = filterAdsFromM3U8(response.data, true);
-                            }
-                            return onSuccess(response, stats, context);
-                        };
-                    }
-                    // 执行原始load方法
-                    load(context, config, callbacks);
-                };
-            }
-        }
-
-        // M3U8清单广告过滤函数
-        function filterAdsFromM3U8(m3u8Content, strictMode = false) {
-            if (!m3u8Content) return '';
-
-            // 按行分割M3U8内容
-            const lines = m3u8Content.split('\n');
-            const filteredLines = [];
-
-            for (let i = 0; i < lines.length; i++) {
-                const line = lines[i];
-
-                // 只过滤#EXT-X-DISCONTINUITY标识
-                if (!line.includes('#EXT-X-DISCONTINUITY')) {
-                    filteredLines.push(line);
-                }
-            }
-
-            return filteredLines.join('\n');
-        }
 
         // 显示错误
         function showError(message) {
@@ -2919,3 +2875,4 @@
     </script>
 </body>
 </html>
+

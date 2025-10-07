@@ -1,39 +1,11 @@
-version: '3.8'
-
+version: '3'
 services:
   libretv:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: libretv:latest
+    image: bradleylzh/libretv:latest
     container_name: libretv
-    restart: unless-stopped
     ports:
-      - "80:80"  # Web服务端口
-      - "5000:5000"  # 弹幕服务端口
+      - "8899:80"
     environment:
-      - TZ=Asia/Shanghai
-      - LIBRETV_PASSWORD=libretvdemo  # 访问密码，可自定义
-      - DANMAKU_API_URL=http://localhost:5000  # 弹幕API地址
-      - NGINX_WORKER_PROCESSES=auto
-      - NGINX_CLIENT_MAX_BODY_SIZE=10m
-      - PYTHONUNBUFFERED=1  # Python不缓冲输出，便于查看日志
-    volumes:
-      - libretv_danmu:/usr/share/nginx/html/danmu_data  # 弹幕数据持久化
-      - ./logs:/tmp  # 将日志目录映射出来，方便查看
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-      start_period: 10s
-    networks:
-      - libretv_net
-
-volumes:
-  libretv_danmu:
-    name: libretv_danmu_data
-
-networks:
-  libretv_net:
-    name: libretv_network
+      - PASSWORD=kkdy123456
+      - DANMAKU_API_URL=http://152.136.12.42:5005
+    restart: unless-stopped
