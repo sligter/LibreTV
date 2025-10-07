@@ -53,7 +53,7 @@ class MgtvVideoScraper:
                                 video_id = source.get('vid')
                                 break
                     
-                    if video_id:
+                    if video_id and title != "未知标题":
                         videos.append({
                             'title': title,
                             'vid': video_id

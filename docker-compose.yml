@@ -7,5 +7,5 @@ services:
       - "8899:80"
     environment:
       - PASSWORD=kkdy123456
-      - DANMAKU_API_URL=http://152.136.12.42:5005
+      - DANMAKU_API_URL=http://xx.xx.xx.xx:5005
     restart: unless-stopped
